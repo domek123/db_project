@@ -178,7 +178,7 @@ CREATE TABLE customers (
     email varchar(255)  NOT NULL,
     address varchar(255)  NOT NULL,
     city varchar(255)  NOT NULL,
-    postal_code varchar(255)  NOT NULL,\
+    postal_code varchar(255)  NOT NULL,
     CONSTRAINT customers_pk PRIMARY KEY (customer_id)
 );
 ```
