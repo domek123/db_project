@@ -1,8 +1,8 @@
 # Podstawy baz danych
 
-dzień i godz zajęć: śr 9:45
+dzień i godz zajęć: śr 11:30
 
-nr zespołu: 6
+nr zespołu: 4
 
 **Autorzy:** Filip Rutkowski, Dominik Wójcik, Weronika Latos
 
@@ -197,13 +197,14 @@ CREATE TABLE customers (
 ### tabela `orders`
 
 ```sql
-CREATE TABLE orders (
-    order_id int  NOT NULL,
-    customer_id int  NOT NULL,
-    order_date DATETIME  NOT NULL,
-    required_date DATETIME  NOT NULL,
-    discount decimal(5,2)  NOT NULL,
-    price decimal(12,2)  NOT NULL,
+CREATE TABLE dbo.orders (
+    order_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    order_date DATETIME2 NOT NULL,
+    planed_ready_date DATETIME2 NOT NULL,
+    collect_date DATETIME2 NULL,
+    discount DECIMAL(5,2) NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
     CONSTRAINT orders_pk PRIMARY KEY (order_id)
 );
 ```
@@ -223,14 +224,15 @@ ALTER TABLE orders ADD CONSTRAINT FK_order_customers
 CREATE INDEX order_customers_idx ON orders (customer_id ASC);
 ```
 
-| Nazwa atrybutu | Typ           | Opis/Uwagi                                                                   |
-| -------------- | ------------- | ---------------------------------------------------------------------------- |
-| order_id       | Integer       | Klucz Główny (PK). Unikalny identyfikator zamówienia.                        |
-| customer_id    | Integer       | Klucz Obcy (FK) do `customers`. Klient składający zamówienie.                |
-| order_date     | DATETIME      | Data złożenia zamówienia.                                                    |
-| required_date  | DATETIME      | Oczekiwana data realizacji przez klienta.                                    |
-| discount       | Decimal(5,2)  | Rabat jednostkowy przydzielony do zamówienia (wartość procentowa, np. 0.15). |
-| price          | Decimal(12,2) | Całkowita cena zamówienia po rabacie.                                        |
+| Nazwa atrybutu    | Typ             | Opis/Uwagi                                                                   |
+| ----------------- | --------------- | ---------------------------------------------------------------------------- |
+| order_id          | Integer         | Klucz Główny (PK). Unikalny identyfikator zamówienia.                        |
+| customer_id       | Integer         | Klucz Obcy (FK) do `customers`. Klient składający zamówienie.                |
+| order_date        | DATETIME        | Data złożenia zamówienia.                                                    |
+| planed_ready_date | DATETIME        | Oczekiwana data realizacji zamówienia.                                       |
+| collect_date      | DATETIME / NULL | Data odbioru zamówienia.                                                     |
+| discount          | Decimal(5,2)    | Rabat jednostkowy przydzielony do zamówienia (wartość procentowa, np. 0.15). |
+| price             | Decimal(12,2)   | Całkowita cena zamówienia po rabacie.                                        |
 
 <br/>
 

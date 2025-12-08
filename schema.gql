@@ -1,0 +1,168 @@
+-- tables
+-- Table: components
+CREATE TABLE dbo.components (
+    component_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    CONSTRAINT components_pk PRIMARY KEY (component_id)
+);
+GO
+
+-- Table: customers
+CREATE TABLE dbo.customers (
+    customer_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    city VARCHAR(255) NOT NULL,
+    postal_code VARCHAR(255) NOT NULL,
+    CONSTRAINT customers_pk PRIMARY KEY (customer_id)
+);
+GO
+
+-- Table: order_details
+CREATE TABLE dbo.order_details (
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    CONSTRAINT order_details_pk PRIMARY KEY (order_id, product_id)
+);
+GO
+
+CREATE INDEX order_details_order_idx ON dbo.order_details (order_id ASC);
+CREATE INDEX order_details_product_idx ON dbo.order_details (product_id ASC);
+GO
+
+-- Table: orders
+CREATE TABLE dbo.orders (
+    order_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    order_date DATETIME2 NOT NULL,
+    planed_ready_date DATETIME2 NOT NULL,
+    collect_date DATETIME2 NULL,
+    discount DECIMAL(5,2) NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
+    CONSTRAINT orders_pk PRIMARY KEY (order_id)
+);
+GO
+
+CREATE INDEX order_customer_idx ON dbo.orders (customer_id ASC);
+GO
+
+-- Table: payments
+CREATE TABLE dbo.payments (
+    payment_id INT NOT NULL,
+    order_id INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    payment_date DATETIME2 NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    CONSTRAINT payments_pk PRIMARY KEY (payment_id)
+);
+GO
+
+CREATE INDEX payment_idx_1 ON dbo.payments (order_id ASC);
+GO
+
+-- Table: product_stock
+CREATE TABLE dbo.product_stock (
+    product_id INT NOT NULL,
+    quantity_available INT NOT NULL,
+    last_update DATETIME2 NOT NULL,
+    CONSTRAINT product_stock_pk PRIMARY KEY (product_id)
+);
+GO
+
+-- Table: production_orders
+CREATE TABLE dbo.production_orders (
+    production_order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    planned_start DATETIME2 NOT NULL,
+    planned_finish DATETIME2 NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    CONSTRAINT production_orders_pk PRIMARY KEY (production_order_id)
+);
+GO
+
+CREATE INDEX production_order_product_idx ON dbo.production_orders (product_id ASC);
+GO
+
+-- Table: products
+CREATE TABLE dbo.products (
+    product_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    production_cost DECIMAL(10,2) NOT NULL,
+    production_time DECIMAL(6,2) NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    CONSTRAINT products_pk PRIMARY KEY (product_id)
+);
+GO
+
+-- Table: products_details
+CREATE TABLE dbo.products_details (
+    product_id INT NOT NULL,
+    component_id INT NOT NULL,
+    quantity INT NOT NULL,
+    CONSTRAINT products_details_pk PRIMARY KEY (product_id, component_id)
+);
+GO
+
+CREATE INDEX products_details_component_idx ON dbo.products_details (component_id ASC);
+CREATE INDEX products_details_product_idx ON dbo.products_details (product_id ASC);
+GO
+
+-- foreign keys
+ALTER TABLE dbo.orders
+    ADD CONSTRAINT order_customer
+    FOREIGN KEY (customer_id)
+    REFERENCES dbo.customers (customer_id)
+    ON DELETE CASCADE;
+GO
+
+ALTER TABLE dbo.order_details
+    ADD CONSTRAINT order_details_order
+    FOREIGN KEY (order_id)
+    REFERENCES dbo.orders (order_id)
+    ON DELETE CASCADE;
+GO
+
+ALTER TABLE dbo.order_details
+    ADD CONSTRAINT order_details_products
+    FOREIGN KEY (product_id)
+    REFERENCES dbo.products (product_id)
+    ON DELETE CASCADE;
+GO
+
+ALTER TABLE dbo.payments
+    ADD CONSTRAINT payment_order
+    FOREIGN KEY (order_id)
+    REFERENCES dbo.orders (order_id);
+GO
+
+ALTER TABLE dbo.product_stock
+    ADD CONSTRAINT product_stock_products
+    FOREIGN KEY (product_id)
+    REFERENCES dbo.products (product_id);
+GO
+
+ALTER TABLE dbo.production_orders
+    ADD CONSTRAINT production_order_products
+    FOREIGN KEY (product_id)
+    REFERENCES dbo.products (product_id);
+GO
+
+ALTER TABLE dbo.products_details
+    ADD CONSTRAINT products_details_components
+    FOREIGN KEY (component_id)
+    REFERENCES dbo.components (component_id)
+    ON DELETE CASCADE;
+GO
+
+ALTER TABLE dbo.products_details
+    ADD CONSTRAINT products_details_products
+    FOREIGN KEY (product_id)
+    REFERENCES dbo.products (product_id)
+    ON DELETE CASCADE;
+GO
+
+-- End of converted file (T-SQL)
