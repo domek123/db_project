@@ -7,8 +7,7 @@ nr zespołu: 6
 **Autorzy:** Filip Rutkowski, Dominik Wójcik, Weronika Latos
 
 # 1. Wymagania i funkcje systemu
-
-(np. lista wymagań, doprecyzowanie wymagań, ,np. historyjki użytkownika, np. przypadki użycia itp.,)
+System służy do obsługi działalności firmy produkcyjno-usługowej zajmującej się wytwarzaniem oraz sprzedażą mebli, które są wyposażeniem pomieszczeń z urządzeniami komputerowymi (m.in. krzesła, biurka, biurka gamingowe, stoły, fotele biurowe, fotele gamingowe, ruchome stojaki na projektory oraz tablice interaktywne). System umożliwia monitorowanie procesu sprzedaży, stanów magazynowych, planowanie produkcji oraz obsługę zamówień klientów. 
 
 # 2. Baza danych
 
