@@ -10,6 +10,18 @@ nr zespołu: 4
 
 System służy do obsługi działalności firmy produkcyjno-usługowej zajmującej się wytwarzaniem oraz sprzedażą mebli, które są wyposażeniem pomieszczeń z urządzeniami komputerowymi (m. in. krzesła, biurka, biurka gamingowe, stoły, fotele biurowe, fotele gamingowe, ruchome stojaki na projektory oraz tablice interaktywne). System umożliwia monitorowanie procesu sprzedaży, stanów magazynowych, planowanie produkcji oraz obsługę zamówień klientów.
 
+
+## Założenia systemowe
+
+- nieograniczony dostęp do poszczególnych części produktów
+- produkownanie dzienne X (ustalonego) sztuk produktu
+- każdy produkt posiada własne stanowisko produkcyjne
+- są dwa typy klienta (indywidualny lub firma)
+- zamówienia najpierw są realizowane z produktów w magazynie, a w drugiej kolejności z produkcji
+- zlecenia produkcji są tworzone na podstawie daty zamówienia
+- produkcja zaczyna się o 6 rano na podstawie zleceń produkcyjnych
+- zniżki są obliczne procentowo do zamówienia
+
 ## Funkcje
 
 Do podstawowych funkcji systemu należą:
@@ -187,7 +199,7 @@ CREATE NONCLUSTERED INDEX customer_id_idx ON orders (customer_id ASC);
 | planed_ready_date | DATETIME2     | Oczekiwana data realizacji zamówienia |
 | collect_date      | DATETIME2     | Data odbioru (opcjonalna)             |
 | discount          | Decimal(3,2)  | Rabat procentowy (0.00–0.99)          |
-| price             | Decimal(12,2) | Łączna cena po rabacie                |
+| price             | Decimal(12,2) | Łączna cena (bez rabatu)              |
 | status            | Varchar(30)   | Status zamówienia                     |
 
 <br/>
