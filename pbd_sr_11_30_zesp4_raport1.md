@@ -10,12 +10,18 @@ nr zespołu: 4
 
 System służy do obsługi działalności firmy produkcyjno-usługowej zajmującej się wytwarzaniem oraz sprzedażą mebli, które są wyposażeniem pomieszczeń z urządzeniami komputerowymi (m. in. krzesła, biurka, biurka gamingowe, stoły, fotele biurowe, fotele gamingowe, ruchome stojaki na projektory oraz tablice interaktywne). System umożliwia monitorowanie procesu sprzedaży, stanów magazynowych, planowanie produkcji oraz obsługę zamówień klientów.
 
-## funkcje
+## Funkcje
+Do podstawowych funkcji systemu należą:
 
-- dodawanie i obsługa zamówień
-- obsługa płatności
-- produkcja nowych mebli
-- aktualizowanie stanu magazynu
+- dodawanie oraz zarządzanie danymi klientów,
+- tworzenie i obsługa zamówień klientów,
+- obsługa i rejestracja płatności,
+- monitorowanie stanu magazynu,
+- naliczanie rabatów procentowych dla zamówień,
+- wyliczanie kosztów zamówienia,
+- przechowywanie statusu zamówienia,
+- planowanie produkcji nowych mebli,
+- tworzenie zleceń produkcyjnych na podstawie zamówień,
 
 # 2. Baza danych
 
