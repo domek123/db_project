@@ -160,8 +160,10 @@ CREATE TABLE products_details (
     CONSTRAINT products_details_pk PRIMARY KEY (product_id, component_id)
 );
 
-CREATE NONCLUSTERED INDEX products_details_component_idx ON products_details (component_id ASC);
-CREATE NONCLUSTERED INDEX products_details_product_idx ON products_details (product_id ASC);
+CREATE NONCLUSTERED INDEX products_details_component_idx
+ON products_details (component_id ASC);
+CREATE NONCLUSTERED INDEX products_details_product_idx
+ON products_details (product_id ASC);
 ```
 
 | Nazwa atrybutu | Typ          | Opis/Uwagi                                                         |
@@ -266,7 +268,8 @@ CREATE TABLE production_orders (
     status VARCHAR(30) NOT NULL
 );
 
-CREATE NONCLUSTERED INDEX production_order_product_idx ON production_orders (product_id ASC);
+CREATE NONCLUSTERED INDEX production_order_product_idx
+ON production_orders (product_id ASC);
 ```
 
 | Nazwa atrybutu      | Typ          | Opis/Uwagi                                                        |
@@ -404,7 +407,8 @@ SELECT
     c.city,
     c.postal_code,
     cc.nip,
-    CASE WHEN cc.customer_id IS NOT NULL THEN 'company' ELSE 'individual' END AS customer_type
+    CASE WHEN cc.customer_id IS NOT NULL THEN 'company' ELSE 'individual' END
+    AS customer_type
 FROM customers c
 LEFT JOIN individual_customers ic ON c.customer_id = ic.customer_id
 LEFT JOIN company_customers cc ON c.customer_id = cc.customer_id;
@@ -469,7 +473,8 @@ SELECT
     l.quantity,
     l.unit_price,
     l.line_total,
-    CAST(CASE WHEN s.sum_line_total > 0 THEN o.price * (l.line_total / s.sum_line_total) ELSE 0 END AS DECIMAL(18,2)) AS net_line_total,
+    CAST(CASE WHEN s.sum_line_total > 0 THEN o.price * (l.line_total / s.sum_line_total)
+    ELSE 0 END AS DECIMAL(18,2)) AS net_line_total,
     od.status
 FROM lines l
 JOIN sums s ON s.order_id = l.order_id
@@ -511,7 +516,8 @@ SELECT
     ISNULL(oo.open_quantity, 0)                    AS open_quantity,
     ISNULL(pp.planned_quantity, 0)                 AS planned_quantity,
     p.units_in_stock - ISNULL(oo.open_quantity, 0) AS stock_balance,
-    (p.units_in_stock - ISNULL(oo.open_quantity, 0)) + ISNULL(pp.planned_quantity, 0) AS balance_after_plan
+    (p.units_in_stock - ISNULL(oo.open_quantity, 0)) + ISNULL(pp.planned_quantity, 0)
+    AS balance_after_plan
 FROM products p
 LEFT JOIN (
     SELECT product_id, SUM(quantity) AS open_quantity
@@ -576,10 +582,13 @@ SELECT
     p.product_id,
     p.name,
     p.production_cost,
-    ISNULL(SUM(pd.quantity * pd.unit_price), 0)                                         AS materials_cost,
-    p.production_cost + ISNULL(SUM(pd.quantity * pd.unit_price), 0)                     AS total_unit_cost,
+    ISNULL(SUM(pd.quantity * pd.unit_price), 0)
+    AS materials_cost,
+    p.production_cost + ISNULL(SUM(pd.quantity * pd.unit_price), 0)
+    AS total_unit_cost,
     p.unit_price,
-    p.unit_price - (p.production_cost + ISNULL(SUM(pd.quantity * pd.unit_price), 0))    AS unit_margin
+    p.unit_price - (p.production_cost + ISNULL(SUM(pd.quantity * pd.unit_price), 0))
+    AS unit_margin
 FROM products p
 LEFT JOIN products_details pd ON pd.product_id = p.product_id
 GROUP BY p.product_id, p.name, p.production_cost, p.unit_price;
@@ -624,7 +633,8 @@ SELECT
 FROM v_order_items oi
 JOIN orders o ON o.order_id = oi.order_id
 JOIN v_product_groups pg ON pg.product_id = oi.product_id
-GROUP BY pg.product_group, YEAR(o.order_date), DATEPART(ISO_WEEK, o.order_date), DATEPART(QUARTER, o.order_date), MONTH(o.order_date);
+GROUP BY pg.product_group, YEAR(o.order_date),
+DATEPART(ISO_WEEK, o.order_date), DATEPART(QUARTER, o.order_date), MONTH(o.order_date);
 
 ```
 
@@ -647,7 +657,9 @@ FROM production_details pd
 JOIN produtcion pr ON pr.production_id = pd.production_id
 JOIN v_product_costs vpc ON vpc.product_id = pr.product_id
 JOIN v_product_groups pg ON pg.product_id = pr.product_id
-GROUP BY pg.product_group, YEAR(pr.production_start), DATEPART(ISO_WEEK, pr.production_start), DATEPART(QUARTER, pr.production_start), MONTH(pr.production_start);
+GROUP BY pg.product_group, YEAR(pr.production_start),
+DATEPART(ISO_WEEK, pr.production_start),
+DATEPART(QUARTER, pr.production_start), MONTH(pr.production_start);
 ```
 
 ## 3.11 Produkty zaplanowane do produkcji - okresy
@@ -665,7 +677,8 @@ SELECT
     SUM(po.quantity)                     AS planned_quantity
 FROM production_orders po
 JOIN v_product_groups pg ON pg.product_id = po.product_id
-GROUP BY pg.product_group, YEAR(po.order_date), DATEPART(ISO_WEEK, po.order_date), DATEPART(QUARTER, po.order_date), MONTH(po.order_date);
+GROUP BY pg.product_group, YEAR(po.order_date), DATEPART(ISO_WEEK, po.order_date),
+DATEPART(QUARTER, po.order_date), MONTH(po.order_date);
 
 ```
 
@@ -727,8 +740,10 @@ BEGIN
         END
 
         -- Wstaw nowe zamówienie z ceną tymczasową
-        INSERT INTO orders (customer_id, order_date, planed_ready_date, discount, price, status, collect_date)
-        VALUES (@customer_id, @order_date, @planed_ready_date, @discount, 0.00, 'Nowe', NULL);
+        INSERT INTO orders (customer_id, order_date, planed_ready_date, discount,
+        price, status, collect_date)
+        VALUES (@customer_id, @order_date, @planed_ready_date, @discount,
+        0.00, 'Nowe', NULL);
 
         SET @order_id = SCOPE_IDENTITY();
         COMMIT TRANSACTION;
@@ -765,7 +780,8 @@ BEGIN
         SET @order_detail_id = SCOPE_IDENTITY();
 
         -- Pobierz rabat z zamówienia
-        SELECT @order_discount = discount FROM orders WHERE order_id = @order_id;
+        SELECT @order_discount = discount FROM orders
+        WHERE order_id = @order_id;
 
         -- Przelicz łączną cenę zamówienia
         UPDATE orders
@@ -846,13 +862,15 @@ BEGIN
     SET NOCOUNT ON;
     BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO production_orders (order_detail_id, order_date, product_id, quantity, status)
+        INSERT INTO production_orders (order_detail_id, order_date,
+        product_id, quantity, status)
         VALUES (@order_detail_id, GETDATE(), @product_id, @quantity, 'Planowane');
 
         SET @production_order_id = SCOPE_IDENTITY();
 
         -- Zaktualizuj status pozycji zamówienia
-        UPDATE order_details SET status = 'W produkcji' WHERE order_detail_id = @order_detail_id;
+        UPDATE order_details SET status = 'W produkcji'
+        WHERE order_detail_id = @order_detail_id;
 
         COMMIT TRANSACTION;
     END TRY
@@ -883,7 +901,8 @@ BEGIN
             WHERE production_order_id = @production_order_id;
 
         -- Dodaj ilość do magazynu
-        UPDATE products SET units_in_stock = units_in_stock + @produced_quantity
+        UPDATE products
+        SET units_in_stock = units_in_stock + @produced_quantity
             WHERE product_id = @product_id;
 
         -- Zaktualizuj status zlecenia produkcyjnego
@@ -915,8 +934,10 @@ AS
 BEGIN
     DECLARE @product_id INT, @quantity INT, @units_in_stock INT;
 
-    SELECT @product_id = product_id, @quantity = quantity FROM inserted;
-    SELECT @units_in_stock = units_in_stock FROM products WHERE product_id = @product_id;
+    SELECT @product_id = product_id, @quantity = quantity
+    FROM inserted;
+    SELECT @units_in_stock = units_in_stock
+    FROM products WHERE product_id = @product_id;
 
     IF @units_in_stock < @quantity
     BEGIN
@@ -988,17 +1009,20 @@ AS
 BEGIN
     DECLARE @production_order_id INT, @order_detail_id INT, @produced_qty INT;
 
-    SELECT @production_order_id = production_order_id, @produced_qty = quantity FROM inserted;
+    SELECT @production_order_id = production_order_id, @produced_qty = quantity
+    FROM inserted;
     SELECT @order_detail_id = order_detail_id FROM production_orders
         WHERE production_order_id = @production_order_id;
 
     -- Jeśli produkcja jest zakończona, oznacz pozycję jako gotową
     DECLARE @po_status VARCHAR(30);
-    SELECT @po_status = status FROM production_orders WHERE production_order_id = @production_order_id;
+    SELECT @po_status = status FROM production_orders
+    WHERE production_order_id = @production_order_id;
 
     IF @po_status = 'Zakończone' AND @order_detail_id IS NOT NULL
     BEGIN
-        UPDATE order_details SET status = 'Gotowe' WHERE order_detail_id = @order_detail_id;
+        UPDATE order_details
+        SET status = 'Gotowe' WHERE order_detail_id = @order_detail_id;
     END
 END;
 ```
