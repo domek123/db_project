@@ -283,17 +283,17 @@ CREATE TABLE production_details (
 
 | Nazwa atrybutu      | Typ         | Opis/Uwagi                        |
 | ------------------- | ----------- | --------------------------------- |
-| production_id       | Integer     | PK, FK do `prodcution`            |
+| production_id       | Integer     | PK, FK do `production`            |
 | production_order_id | Integer     | PK, FK do `production_orders`     |
 | quantity            | Integer     | Ilość zrealizowana w danej partii |
 | status              | Varchar(30) | Status etapu produkcji            |
 
 <br/>
 
-### tabela `prodcution` (pisownia jak w pliku)
+### tabela `production`
 
 ```sql
-CREATE TABLE prodcution (
+CREATE TABLE production (
     production_id INT PRIMARY KEY,
     product_id INT NOT NULL,
     production_start DATE NOT NULL,
@@ -347,15 +347,13 @@ ALTER TABLE payments ADD CONSTRAINT payment_order
     FOREIGN KEY (order_id)
     REFERENCES orders (order_id);
 
--- prodcution -> products
-ALTER TABLE prodcution ADD CONSTRAINT prodcution_products
-    FOREIGN KEY (product_id)
-    REFERENCES products (product_id);
+-- production -> products
+ALTER TABLE production ADD CONSTRAINT production_products
+    FOREIGN KEY (product_id) REFERENCES products (product_id);
 
--- production_details -> prodcution / production_orders
-ALTER TABLE production_details ADD CONSTRAINT production_details_prodcution
-    FOREIGN KEY (production_id)
-    REFERENCES prodcution (production_id);
+-- production_details -> production / production_orders
+ALTER TABLE production_details ADD CONSTRAINT production_details_production
+    FOREIGN KEY (production_id) REFERENCES production (production_id);
 ALTER TABLE production_details ADD CONSTRAINT production_details_production_orders
     FOREIGN KEY (production_order_id)
     REFERENCES production_orders (production_order_id);
@@ -374,7 +372,326 @@ ALTER TABLE products_details ADD CONSTRAINT products_details_components
     REFERENCES components (component_id)
     ON DELETE CASCADE;
 ALTER TABLE products_details ADD CONSTRAINT products_details_products
-    FOREIGN KEY (product_id)
-    REFERENCES products (product_id)
-    ON DELETE CASCADE;
+    FOREIGN KEY (product_id) REFERENCES products (product_id) ON DELETE CASCADE;
+```
+
+# 3. Widoki
+
+Poniżej przedstawiono zestaw widoków wspierających kluczowe funkcje systemu (monitorowanie sprzedaży i płatności, stany magazynowe, planowanie i postęp produkcji), zgodnych z wymaganiami projektu.
+
+## 3.1 Widok klientów łączony
+
+Ujednolica dostęp do klientów indywidualnych i firmowych.
+
+```sql
+CREATE VIEW v_customers_all AS
+SELECT
+    ic.customer_id            AS customer_id,
+    ic.name                   AS customer_name,
+    ic.email,
+    ic.address,
+    ic.city,
+    ic.postal_code,
+    CAST(NULL AS INT)         AS nip,
+    'individual'              AS customer_type
+FROM individual_customers ic
+UNION ALL
+SELECT
+    cc.company_id             AS customer_id,
+    cc.name                   AS customer_name,
+    cc.email,
+    cc.address,
+    cc.city,
+    cc.postal_code,
+    cc.nip,
+    'company'                 AS customer_type
+FROM company_customers cc;
+```
+
+## 3.2 Podsumowanie zamówień i płatności
+
+Widok agregujący zamówienia, klienta, wartości płatności i saldo.
+
+```sql
+CREATE VIEW v_orders_summary AS
+SELECT
+    o.order_id,
+    c.customer_type,
+    c.customer_name,
+    o.order_date,
+    o.planed_ready_date,
+    o.collect_date,
+    o.status,
+    o.discount,
+    o.price                                         AS order_total,
+    ISNULL(ps.paid_amount, 0)                       AS paid_amount,
+    o.price - ISNULL(ps.paid_amount, 0)             AS outstanding_amount
+FROM orders o
+LEFT JOIN v_customers_all c
+    ON c.customer_id = o.customer_id
+LEFT JOIN (
+    SELECT order_id, SUM(price) AS paid_amount
+    FROM payments
+    WHERE status <> 'Anulowana'
+    GROUP BY order_id
+) ps ON ps.order_id = o.order_id;
+```
+
+## 3.3 Szczegóły pozycji zamówień
+
+Widok rozszerza pozycje zamówień o nazwę produktu i wartość pozycji.
+
+```sql
+CREATE VIEW v_order_items AS
+WITH lines AS (
+    SELECT
+        od.order_detail_id,
+        od.order_id,
+        od.product_id,
+        p.name                               AS product_name,
+        od.quantity,
+        od.unit_price,
+        CAST(od.quantity * od.unit_price AS DECIMAL(18,2)) AS line_total
+    FROM order_details od
+    JOIN products p ON p.product_id = od.product_id
+), sums AS (
+    SELECT order_id, SUM(line_total) AS sum_line_total
+    FROM lines
+    GROUP BY order_id
+)
+SELECT
+    l.order_detail_id,
+    l.order_id,
+    l.product_id,
+    l.product_name,
+    l.quantity,
+    l.unit_price,
+    l.line_total,
+    CAST(CASE WHEN s.sum_line_total > 0 THEN o.price * (l.line_total / s.sum_line_total) ELSE 0 END AS DECIMAL(18,2)) AS net_line_total,
+    od.status
+FROM lines l
+JOIN sums s ON s.order_id = l.order_id
+JOIN orders o ON o.order_id = l.order_id
+JOIN order_details od ON od.order_detail_id = l.order_detail_id;
+```
+
+## 3.4 Stan magazynowy i rezerwacje
+
+Widok pokazuje stan produktu wraz z niezrealizowanymi ilościami z zamówień.
+
+```sql
+CREATE VIEW v_products_stock_status AS
+SELECT
+    p.product_id,
+    p.name,
+    p.units_in_stock,
+    ISNULL(oo.open_quantity, 0)                        AS open_quantity,
+    p.units_in_stock - ISNULL(oo.open_quantity, 0)     AS stock_balance
+FROM products p
+LEFT JOIN (
+    SELECT product_id, SUM(quantity) AS open_quantity
+    FROM order_details
+    WHERE status <> 'Gotowe'
+    GROUP BY product_id
+) oo ON oo.product_id = p.product_id;
+```
+
+### 3.4a Stan magazynu z planem produkcji
+
+Widok łączy bieżący stan z ilościami zaplanowanymi do produkcji.
+
+```sql
+CREATE VIEW v_stock_and_planned AS
+SELECT
+    p.product_id,
+    p.name,
+    p.units_in_stock,
+    ISNULL(oo.open_quantity, 0)                    AS open_quantity,
+    ISNULL(pp.planned_quantity, 0)                 AS planned_quantity,
+    p.units_in_stock - ISNULL(oo.open_quantity, 0) AS stock_balance,
+    (p.units_in_stock - ISNULL(oo.open_quantity, 0)) + ISNULL(pp.planned_quantity, 0) AS balance_after_plan
+FROM products p
+LEFT JOIN (
+    SELECT product_id, SUM(quantity) AS open_quantity
+    FROM order_details
+    WHERE status <> 'Gotowe'
+    GROUP BY product_id
+) oo ON oo.product_id = p.product_id
+LEFT JOIN (
+    SELECT product_id, SUM(quantity) AS planned_quantity
+    FROM production_orders
+    GROUP BY product_id
+) pp ON pp.product_id = p.product_id;
+```
+
+## 3.5 Plan produkcji - estymacje
+
+Szacuje czas realizacji zlecenia produkcyjnego na podstawie wydajności produktu.
+
+```sql
+CREATE VIEW v_production_plan_estimates AS
+SELECT
+    po.production_order_id,
+    po.order_date,
+    po.product_id,
+    p.name AS product_name,
+    po.quantity,
+    p.units_per_day,
+    CEILING(CAST(po.quantity AS DECIMAL(10,2)) / NULLIF(p.units_per_day, 0))                                    AS estimated_days,
+    DATEADD(DAY, CEILING(CAST(po.quantity AS DECIMAL(10,2)) / NULLIF(p.units_per_day, 0)), po.order_date)        AS estimated_finish_date,
+    po.status
+FROM production_orders po
+JOIN products p ON p.product_id = po.product_id;
+```
+
+## 3.6 Postęp produkcji
+
+Widok zestawia ilość zaplanowaną z faktycznie wytworzoną.
+
+```sql
+CREATE VIEW v_production_progress AS
+SELECT
+    po.production_order_id,
+    po.product_id,
+    p.name                                      AS product_name,
+    po.quantity                                 AS planned_quantity,
+    ISNULL(SUM(pd.quantity), 0)                 AS produced_quantity,
+    (po.quantity - ISNULL(SUM(pd.quantity), 0)) AS remaining_quantity,
+    po.status
+FROM production_orders po
+LEFT JOIN production_details pd ON pd.production_order_id = po.production_order_id
+JOIN products p ON p.product_id = po.product_id
+GROUP BY po.production_order_id, po.product_id, p.name, po.quantity, po.status;
+```
+
+## 3.7 Koszty produktu i marża
+
+Widok kalkuluje koszt materiałów i marżę na podstawie składników produktu.
+
+```sql
+CREATE VIEW v_product_costs AS
+SELECT
+    p.product_id,
+    p.name,
+    p.production_cost,
+    ISNULL(SUM(pd.quantity * pd.unit_price), 0)                                         AS materials_cost,
+    p.production_cost + ISNULL(SUM(pd.quantity * pd.unit_price), 0)                     AS total_unit_cost,
+    p.unit_price,
+    p.unit_price - (p.production_cost + ISNULL(SUM(pd.quantity * pd.unit_price), 0))    AS unit_margin
+FROM products p
+LEFT JOIN products_details pd ON pd.product_id = p.product_id
+GROUP BY p.product_id, p.name, p.production_cost, p.unit_price;
+```
+
+## 3.8 Grupowanie produktów
+
+Widok klasyfikuje produkty do grup na podstawie nazwy. Umożliwia agregowanie raportów sprzedaży i produkcji wg kategorii produktów (krzesła, biurka, fotele, itd.).
+
+```sql
+CREATE VIEW v_product_groups AS
+SELECT
+    p.product_id,
+    p.name,
+    CASE
+        WHEN p.name LIKE '%krzes%' THEN 'Krzesła'
+        WHEN p.name LIKE '%biurko%' OR p.name LIKE '%desk%' THEN 'Biurka'
+        WHEN p.name LIKE '%fotel%' THEN 'Fotele'
+        WHEN p.name LIKE '%stojak%' THEN 'Stojaki'
+        WHEN p.name LIKE '%tablic%' THEN 'Tablice'
+        ELSE 'Inne'
+    END AS product_group
+FROM products p;
+```
+
+## 3.9 Sprzedaż grup produktów - tygodnie/miesiące/kwartały/lata
+
+Agreacja sprzedaży po grupach produktów w podziale na okresy (tydzień, miesiąc, kwartał, rok). Zawiera liczbę zamówień, ilości, przychód brutto (bez rabatów) i przychód netto (z uwzględnieniem rabatów). Wspiera raportowanie dla kadry zarządczej.
+
+```sql
+CREATE VIEW v_sales_periods AS
+SELECT
+    pg.product_group,
+    YEAR(o.order_date)                            AS year,
+    DATEPART(ISO_WEEK, o.order_date)              AS iso_week,
+    DATEPART(QUARTER, o.order_date)               AS quarter,
+    MONTH(o.order_date)                           AS month,
+    COUNT(DISTINCT o.order_id)                    AS orders_count,
+    SUM(oi.quantity)                              AS total_quantity,
+    SUM(oi.line_total)                            AS gross_revenue,
+    SUM(oi.net_line_total)                        AS net_revenue
+FROM v_order_items oi
+JOIN orders o ON o.order_id = oi.order_id
+JOIN v_product_groups pg ON pg.product_id = oi.product_id
+GROUP BY pg.product_group, YEAR(o.order_date), DATEPART(ISO_WEEK, o.order_date), DATEPART(QUARTER, o.order_date), MONTH(o.order_date);
+
+```
+
+## 3.10 Koszt produkcji - tygodnie/miesiące/kwartały/lata
+
+Agreacja kosztów produkcji po grupach produktów w podziale na okresy czasowe (tydzień, miesiąc, kwartał, rok). Zawiera liczbę wyprodukowanych sztuk i łączną wartość kosztów produkcji (koszt jednostkowy × ilość). Obsługuje raporty dla zarządu o wydatkach produkcji.
+
+```sql
+
+CREATE VIEW v_production_costs_periods AS
+SELECT
+    pg.product_group,
+    YEAR(pr.production_start)                     AS year,
+    DATEPART(ISO_WEEK, pr.production_start)       AS iso_week,
+    DATEPART(QUARTER, pr.production_start)        AS quarter,
+    MONTH(pr.production_start)                    AS month,
+    SUM(pd.quantity)                              AS produced_quantity,
+    SUM(pd.quantity * vpc.total_unit_cost)        AS production_cost_value
+FROM production_details pd
+JOIN produtcion pr ON pr.production_id = pd.production_id
+JOIN v_product_costs vpc ON vpc.product_id = pr.product_id
+JOIN v_product_groups pg ON pg.product_id = pr.product_id
+GROUP BY pg.product_group, YEAR(pr.production_start), DATEPART(ISO_WEEK, pr.production_start), DATEPART(QUARTER, pr.production_start), MONTH(pr.production_start);
+```
+
+## 3.11 Produkty zaplanowane do produkcji - okresy
+
+Raport planów produkcji po grupach produktów w różnych przedziałach czasu (tydzień, miesiąc, kwartał, rok). Pokazuje zagregowane ilości zaplanowane do wytworzenia na każdy okres. Wspiera planowanie i monitorowanie zdolności produkcyjnej.
+
+```sql
+CREATE VIEW v_planned_production_periods AS
+SELECT
+    pg.product_group,
+    YEAR(po.order_date)                  AS year,
+    DATEPART(ISO_WEEK, po.order_date)    AS iso_week,
+    DATEPART(QUARTER, po.order_date)     AS quarter,
+    MONTH(po.order_date)                 AS month,
+    SUM(po.quantity)                     AS planned_quantity
+FROM production_orders po
+JOIN v_product_groups pg ON pg.product_id = po.product_id
+GROUP BY pg.product_group, YEAR(po.order_date), DATEPART(ISO_WEEK, po.order_date), DATEPART(QUARTER, po.order_date), MONTH(po.order_date);
+
+```
+
+## 3.12 Historia zamówień klienta - z rabatami i okresami
+
+Historia zamówień dla każdego klienta z wymiarami czasu (rok, kwartał, miesiąc). Zawiera informacje o rabatach przydzielonych do zamówienia, łącznej kwocie, wartości zapłaconej i saldzie wymagającym zapłaty. Umożliwia śledzenie poprzednich zamówień i historii rabatów per klient.
+
+```sql
+CREATE VIEW v_customer_orders_history AS
+SELECT
+    c.customer_id,
+    c.customer_type,
+    c.customer_name,
+    o.order_id,
+    o.order_date,
+    YEAR(o.order_date)                 AS year,
+    DATEPART(QUARTER, o.order_date)    AS quarter,
+    MONTH(o.order_date)                AS month,
+    o.discount,
+    o.price                            AS order_total,
+    ps.paid_amount,
+    (o.price - ISNULL(ps.paid_amount,0)) AS outstanding_amount
+FROM v_customers_all c
+JOIN orders o ON o.customer_id = c.customer_id
+LEFT JOIN (
+    SELECT order_id, SUM(price) AS paid_amount
+    FROM payments
+    WHERE status <> 'Anulowana'
+    GROUP BY order_id
+) ps ON ps.order_id = o.order_id;
 ```
