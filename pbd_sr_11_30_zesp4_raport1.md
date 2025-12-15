@@ -11,6 +11,7 @@ nr zespołu: 4
 System służy do obsługi działalności firmy produkcyjno-usługowej zajmującej się wytwarzaniem oraz sprzedażą mebli, które są wyposażeniem pomieszczeń z urządzeniami komputerowymi (m. in. krzesła, biurka, biurka gamingowe, stoły, fotele biurowe, fotele gamingowe, ruchome stojaki na projektory oraz tablice interaktywne). System umożliwia monitorowanie procesu sprzedaży, stanów magazynowych, planowanie produkcji oraz obsługę zamówień klientów.
 
 ## Funkcje
+
 Do podstawowych funkcji systemu należą:
 
 - dodawanie oraz zarządzanie danymi klientów,
@@ -31,16 +32,35 @@ Do podstawowych funkcji systemu należą:
 
 ## Opis poszczególnych tabel
 
-Z racji na to, że docelowa baza będzie w SQL Server, stosujemy `DATETIME2` zamiast `TIMESTAMP`. Poniżej odzwierciedlenie bieżącego stanu z pliku projekt.sql (Redgate Data Modeler, 2025-12-15).
+Z racji na to, że docelowa baza będzie w SQL Server, stosujemy `DATETIME2` zamiast `TIMESTAMP`. Poniżej odzwierciedlenie bieżącego stanu z pliku projekt.sql.
+
+### tabela `company_customers`
+
+```sql
+CREATE TABLE company_customers (
+    customer_id INT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    nip INT NOT NULL,
+    email VARCHAR(255) NOT NULL
+);
+```
+
+| Nazwa atrybutu | Typ          | Opis/Uwagi        |
+| -------------- | ------------ | ----------------- |
+| customer_id    | Integer      | Klucz główny (PK) |
+| name           | Varchar(255) | Nazwa firmy       |
+| nip            | Integer      | Numer NIP         |
+| email          | Varchar(255) | E-mail firmowy    |
+
+<br/>
 
 ### tabela `components`
 
 ```sql
 CREATE TABLE components (
-    component_id INT NOT NULL,
+    component_id INT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    price DECIMAL(5,2) NOT NULL,
-    CONSTRAINT components_pk PRIMARY KEY CLUSTERED (component_id)
+    price DECIMAL(5, 2) NOT NULL
 );
 ```
 
@@ -52,17 +72,58 @@ CREATE TABLE components (
 
 <br/>
 
+### tabela `customers`
+
+```sql
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY,
+    type INT NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    city VARCHAR(255) NOT NULL,
+    postal_code VARCHAR(255) NOT NULL
+);
+```
+
+| Nazwa atrybutu | Typ          | Opis/Uwagi                                                         |
+| -------------- | ------------ | ------------------------------------------------------------------ |
+| customer_id    | Integer      | Klucz główny (PK)                                                  |
+| type           | Integer      | Typ klienta (FK do `company_customers` lub `individual_customers`) |
+| address        | Varchar(255) | Ulica i numer                                                      |
+| city           | Varchar(255) | Miejscowość                                                        |
+| postal_code    | Varchar(255) | Kod pocztowy                                                       |
+
+<br/>
+
+### tabela `individual_customers`
+
+```sql
+CREATE TABLE individual_customers (
+    customer_id INT PRIMARY KEY,
+    firstname VARCHAR(255) NOT NULL,
+    lastname VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL
+);
+```
+
+| Nazwa atrybutu | Typ          | Opis/Uwagi        |
+| -------------- | ------------ | ----------------- |
+| customer_id    | Integer      | Klucz główny (PK) |
+| firstname      | Varchar(255) | Imię klienta      |
+| lastname       | Varchar(255) | Nazwisko klienta  |
+| email          | Varchar(255) | Adres e-mail      |
+
+<br/>
+
 ### tabela `products`
 
 ```sql
 CREATE TABLE products (
-    product_id INT NOT NULL,
+    product_id INT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    production_cost DECIMAL(10,2) NOT NULL,
+    production_cost DECIMAL(10, 2) NOT NULL,
     units_per_day INT NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    units_in_stock INT NOT NULL,
-    CONSTRAINT products_pk PRIMARY KEY CLUSTERED (product_id)
+    unit_price DECIMAL(10, 2) NOT NULL,
+    units_in_stock INT NOT NULL
 );
 ```
 
@@ -84,8 +145,8 @@ CREATE TABLE products_details (
     product_id INT NOT NULL,
     component_id INT NOT NULL,
     quantity INT NOT NULL,
-    unit_price DECIMAL(5,2) NOT NULL,
-    CONSTRAINT products_details_pk PRIMARY KEY CLUSTERED (product_id,component_id)
+    unit_price DECIMAL(5, 2) NOT NULL,
+    CONSTRAINT products_details_pk PRIMARY KEY (product_id, component_id)
 );
 
 CREATE NONCLUSTERED INDEX products_details_component_idx ON products_details (component_id ASC);
@@ -101,86 +162,33 @@ CREATE NONCLUSTERED INDEX products_details_product_idx ON products_details (prod
 
 <br/>
 
-### tabela `company_customers`
-
-```sql
-CREATE TABLE company_customers (
-    company_id INT NOT NULL,
-    name NVARCHAR(255) NOT NULL,
-    nip INT NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    address VARCHAR(255) NOT NULL,
-    city VARCHAR(255) NOT NULL,
-    postal_code VARCHAR(255) NOT NULL,
-    CONSTRAINT company_customers_pk PRIMARY KEY CLUSTERED (company_id)
-);
-```
-
-| Nazwa atrybutu | Typ           | Opis/Uwagi        |
-| -------------- | ------------- | ----------------- |
-| company_id     | Integer       | Klucz główny (PK) |
-| name           | NVarchar(255) | Nazwa firmy       |
-| nip            | Integer       | Numer NIP         |
-| email          | Varchar(255)  | E-mail firmowy    |
-| address        | Varchar(255)  | Ulica i numer     |
-| city           | Varchar(255)  | Miejscowość       |
-| postal_code    | Varchar(255)  | Kod pocztowy      |
-
-<br/>
-
-### tabela `individual_customers`
-
-```sql
-CREATE TABLE individual_customers (
-    customer_id INT NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    address VARCHAR(255) NOT NULL,
-    city VARCHAR(255) NOT NULL,
-    postal_code VARCHAR(255) NOT NULL,
-    CONSTRAINT individual_customers_pk PRIMARY KEY CLUSTERED (customer_id)
-);
-```
-
-| Nazwa atrybutu | Typ          | Opis/Uwagi              |
-| -------------- | ------------ | ----------------------- |
-| customer_id    | Integer      | Klucz główny (PK)       |
-| name           | Varchar(255) | Imię i nazwisko klienta |
-| email          | Varchar(255) | Adres e-mail            |
-| address        | Varchar(255) | Ulica i numer           |
-| city           | Varchar(255) | Miejscowość             |
-| postal_code    | Varchar(255) | Kod pocztowy            |
-
-<br/>
-
 ### tabela `orders`
 
 ```sql
 CREATE TABLE orders (
-    order_id INT NOT NULL,
+    order_id INT PRIMARY KEY,
     customer_id INT NOT NULL,
     order_date DATETIME2 NOT NULL,
     planed_ready_date DATETIME2 NOT NULL,
     collect_date DATETIME2 NULL,
-    discount DECIMAL(3,2) NOT NULL,
-    price DECIMAL(12,2) NOT NULL,
-    status VARCHAR(30) NOT NULL,
-    CONSTRAINT orders_pk PRIMARY KEY CLUSTERED (order_id)
+    discount DECIMAL(3, 2) NOT NULL,
+    price DECIMAL(12, 2) NOT NULL,
+    status VARCHAR(30) NOT NULL
 );
 
-CREATE NONCLUSTERED INDEX order_customer_idx ON orders (customer_id ASC);
+CREATE NONCLUSTERED INDEX customer_id_idx ON orders (customer_id ASC);
 ```
 
-| Nazwa atrybutu    | Typ              | Opis/Uwagi                                                                     |
-| ----------------- | ---------------- | ------------------------------------------------------------------------------ |
-| order_id          | Integer          | Klucz główny (PK)                                                              |
-| customer_id       | Integer          | FK do `individual_customers` lub `company_customers` (dwie relacje równoległe) |
-| order_date        | DATETIME2        | Data złożenia zamówienia                                                       |
-| planed_ready_date | DATETIME2        | Oczekiwana data realizacji zamówienia                                          |
-| collect_date      | DATETIME2 / NULL | Data odbioru (opcjonalna)                                                      |
-| discount          | Decimal(3,2)     | Rabat procentowy przydzielony do zamówienia (0.00–0.99)                        |
-| price             | Decimal(12,2)    | Łączna cena zamówienia po rabacie                                              |
-| status            | Varchar(30)      | Status zamówienia (np. 'Nowe', 'Realizowane', 'Zakończone')                    |
+| Nazwa atrybutu    | Typ           | Opis/Uwagi                            |
+| ----------------- | ------------- | ------------------------------------- |
+| order_id          | Integer       | Klucz główny (PK)                     |
+| customer_id       | Integer       | FK do `customers`                     |
+| order_date        | DATETIME2     | Data złożenia zamówienia              |
+| planed_ready_date | DATETIME2     | Oczekiwana data realizacji zamówienia |
+| collect_date      | DATETIME2     | Data odbioru (opcjonalna)             |
+| discount          | Decimal(3,2)  | Rabat procentowy (0.00–0.99)          |
+| price             | Decimal(12,2) | Łączna cena po rabacie                |
+| status            | Varchar(30)   | Status zamówienia                     |
 
 <br/>
 
@@ -188,13 +196,12 @@ CREATE NONCLUSTERED INDEX order_customer_idx ON orders (customer_id ASC);
 
 ```sql
 CREATE TABLE order_details (
-    order_detail_id INT NOT NULL,
+    order_detail_id INT PRIMARY KEY,
     order_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    status VARCHAR(30) NOT NULL,
-    CONSTRAINT order_details_pk PRIMARY KEY CLUSTERED (order_detail_id)
+    unit_price DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(30) NOT NULL
 );
 
 CREATE NONCLUSTERED INDEX order_details_order_idx ON order_details (order_id ASC);
@@ -216,12 +223,11 @@ CREATE NONCLUSTERED INDEX order_details_product_idx ON order_details (product_id
 
 ```sql
 CREATE TABLE payments (
-    payment_id INT NOT NULL,
+    payment_id INT PRIMARY KEY,
     order_id INT NOT NULL,
-    price DECIMAL(10,2) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
     payment_date DATETIME2 NOT NULL,
-    status VARCHAR(30) NOT NULL,
-    CONSTRAINT payments_pk PRIMARY KEY CLUSTERED (payment_id)
+    status VARCHAR(30) NOT NULL
 );
 
 CREATE NONCLUSTERED INDEX payment_idx_1 ON payments (order_id ASC);
@@ -241,13 +247,12 @@ CREATE NONCLUSTERED INDEX payment_idx_1 ON payments (order_id ASC);
 
 ```sql
 CREATE TABLE production_orders (
-    production_order_id INT NOT NULL,
+    production_order_id INT PRIMARY KEY,
     order_detail_id INT NULL,
     order_date DATETIME2 NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
-    status VARCHAR(30) NOT NULL,
-    CONSTRAINT production_orders_pk PRIMARY KEY CLUSTERED (production_order_id)
+    status VARCHAR(30) NOT NULL
 );
 
 CREATE NONCLUSTERED INDEX production_order_product_idx ON production_orders (product_id ASC);
@@ -272,7 +277,7 @@ CREATE TABLE production_details (
     production_order_id INT NOT NULL,
     quantity INT NOT NULL,
     status VARCHAR(30) NOT NULL,
-    CONSTRAINT production_details_pk PRIMARY KEY CLUSTERED (production_id,production_order_id)
+    CONSTRAINT production_details_pk PRIMARY KEY (production_id, production_order_id)
 );
 ```
 
@@ -289,13 +294,12 @@ CREATE TABLE production_details (
 
 ```sql
 CREATE TABLE prodcution (
-    production_id INT NOT NULL,
+    production_id INT PRIMARY KEY,
     product_id INT NOT NULL,
     production_start DATE NOT NULL,
     porductiion_finish DATE NOT NULL,
     quantity INT NOT NULL,
-    status INT NOT NULL,
-    CONSTRAINT prodcution_pk PRIMARY KEY CLUSTERED (production_id)
+    status INT NOT NULL
 );
 ```
 
@@ -313,46 +317,64 @@ CREATE TABLE prodcution (
 ## Klucze obce
 
 ```sql
--- orders -> individual_customers
-ALTER TABLE orders ADD CONSTRAINT order_customer
+-- orders -> customers
+ALTER TABLE orders ADD CONSTRAINT orders_customers
     FOREIGN KEY (customer_id)
-    REFERENCES individual_customers (customer_id)
-    ON DELETE CASCADE;
+    REFERENCES customers (customer_id);
 
--- orders -> company_customers (równoległa relacja)
-ALTER TABLE orders ADD CONSTRAINT orders_company_customers
+-- customers -> company_customers (inheritance)
+ALTER TABLE customers ADD CONSTRAINT customers_company_customers
     FOREIGN KEY (customer_id)
-    REFERENCES company_customers (company_id);
+    REFERENCES company_customers (customer_id);
+
+-- customers -> individual_customers (inheritance)
+ALTER TABLE customers ADD CONSTRAINT customers_individual_customers
+    FOREIGN KEY (customer_id)
+    REFERENCES individual_customers (customer_id);
 
 -- order_details -> orders / products
 ALTER TABLE order_details ADD CONSTRAINT order_details_order
-    FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE;
+    FOREIGN KEY (order_id)
+    REFERENCES orders (order_id)
+    ON DELETE CASCADE;
 ALTER TABLE order_details ADD CONSTRAINT order_details_products
-    FOREIGN KEY (product_id) REFERENCES products (product_id) ON DELETE CASCADE;
+    FOREIGN KEY (product_id)
+    REFERENCES products (product_id)
+    ON DELETE CASCADE;
 
 -- payments -> orders
 ALTER TABLE payments ADD CONSTRAINT payment_order
-    FOREIGN KEY (order_id) REFERENCES orders (order_id);
+    FOREIGN KEY (order_id)
+    REFERENCES orders (order_id);
 
 -- prodcution -> products
 ALTER TABLE prodcution ADD CONSTRAINT prodcution_products
-    FOREIGN KEY (product_id) REFERENCES products (product_id);
+    FOREIGN KEY (product_id)
+    REFERENCES products (product_id);
 
 -- production_details -> prodcution / production_orders
 ALTER TABLE production_details ADD CONSTRAINT production_details_prodcution
-    FOREIGN KEY (production_id) REFERENCES prodcution (production_id);
+    FOREIGN KEY (production_id)
+    REFERENCES prodcution (production_id);
 ALTER TABLE production_details ADD CONSTRAINT production_details_production_orders
-    FOREIGN KEY (production_order_id) REFERENCES production_orders (production_order_id);
+    FOREIGN KEY (production_order_id)
+    REFERENCES production_orders (production_order_id);
 
 -- production_orders -> products / order_details
 ALTER TABLE production_orders ADD CONSTRAINT production_order_products
-    FOREIGN KEY (product_id) REFERENCES products (product_id);
+    FOREIGN KEY (product_id)
+    REFERENCES products (product_id);
 ALTER TABLE production_orders ADD CONSTRAINT production_orders_order_details
-    FOREIGN KEY (order_detail_id) REFERENCES order_details (order_detail_id);
+    FOREIGN KEY (order_detail_id)
+    REFERENCES order_details (order_detail_id);
 
 -- products_details -> components / products
 ALTER TABLE products_details ADD CONSTRAINT products_details_components
-    FOREIGN KEY (component_id) REFERENCES components (component_id) ON DELETE CASCADE;
+    FOREIGN KEY (component_id)
+    REFERENCES components (component_id)
+    ON DELETE CASCADE;
 ALTER TABLE products_details ADD CONSTRAINT products_details_products
-    FOREIGN KEY (product_id) REFERENCES products (product_id) ON DELETE CASCADE;
+    FOREIGN KEY (product_id)
+    REFERENCES products (product_id)
+    ON DELETE CASCADE;
 ```
