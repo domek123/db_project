@@ -381,31 +381,22 @@ Poniżej przedstawiono zestaw widoków wspierających kluczowe funkcje systemu (
 
 ## 3.1 Widok klientów łączony
 
-Ujednolica dostęp do klientów indywidualnych i firmowych.
+Ujednolica dostęp do klientów indywidualnych i firmowych poprzez tabelę `customers`.
 
 ```sql
 CREATE VIEW v_customers_all AS
 SELECT
-    ic.customer_id            AS customer_id,
-    ic.name                   AS customer_name,
-    ic.email,
-    ic.address,
-    ic.city,
-    ic.postal_code,
-    CAST(NULL AS INT)         AS nip,
-    'individual'              AS customer_type
-FROM individual_customers ic
-UNION ALL
-SELECT
-    cc.company_id             AS customer_id,
-    cc.name                   AS customer_name,
-    cc.email,
-    cc.address,
-    cc.city,
-    cc.postal_code,
+    c.customer_id,
+    COALESCE(ic.firstname + ' ' + ic.lastname, cc.name) AS customer_name,
+    COALESCE(ic.email, cc.email) AS email,
+    c.address,
+    c.city,
+    c.postal_code,
     cc.nip,
-    'company'                 AS customer_type
-FROM company_customers cc;
+    CASE WHEN cc.customer_id IS NOT NULL THEN 'company' ELSE 'individual' END AS customer_type
+FROM customers c
+LEFT JOIN individual_customers ic ON c.customer_id = ic.customer_id
+LEFT JOIN company_customers cc ON c.customer_id = cc.customer_id;
 ```
 
 ## 3.2 Podsumowanie zamówień i płatności
@@ -716,6 +707,14 @@ BEGIN
     SET NOCOUNT ON;
     BEGIN TRANSACTION;
     BEGIN TRY
+        -- Sprawdź czy klient istnieje w tabeli customers
+        IF NOT EXISTS (SELECT 1 FROM customers WHERE customer_id = @customer_id)
+        BEGIN
+            RAISERROR('Klient nie istnieje!', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
         -- Wstaw nowe zamówienie z ceną tymczasową
         INSERT INTO orders (customer_id, order_date, planed_ready_date, discount, price, status, collect_date)
         VALUES (@customer_id, @order_date, @planed_ready_date, @discount, 0.00, 'Nowe', NULL);
