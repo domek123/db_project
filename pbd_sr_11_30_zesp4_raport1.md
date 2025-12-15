@@ -10,7 +10,6 @@ nr zespołu: 4
 
 System służy do obsługi działalności firmy produkcyjno-usługowej zajmującej się wytwarzaniem oraz sprzedażą mebli, które są wyposażeniem pomieszczeń z urządzeniami komputerowymi (m. in. krzesła, biurka, biurka gamingowe, stoły, fotele biurowe, fotele gamingowe, ruchome stojaki na projektory oraz tablice interaktywne). System umożliwia monitorowanie procesu sprzedaży, stanów magazynowych, planowanie produkcji oraz obsługę zamówień klientów.
 
-
 ## Założenia systemowe
 
 - nieograniczony dostęp do poszczególnych części produktów
@@ -1003,3 +1002,112 @@ BEGIN
     END
 END;
 ```
+
+# 3. Widoki, procedury, funkcje i triggery
+
+## Opis realizowanych wymagań
+
+Na podstawie wymagań opisanych w punkcie 1, zaimplementowano następujące obiekty bazodanowe:
+
+### Widoki (Views)
+
+Widoki zapewniają wygodny dostęp do danych z różnych perspektyw:
+
+- **`vw_available_products`** — lista produktów dostępnych w magazynie (ilość > 0)
+- **`vw_pending_orders`** — zamówienia w statusie "Nowe" lub "Realizowane", posortowane wg daty planowej
+- **`vw_order_details_summary`** — szczegóły każdego zamówienia z informacją o produktach, ilościach i cenach
+- **`vw_inventory_status`** — aktualne stany magazynowe z klasyfikacją (Dostępny/Niski stan/Brak)
+- **`vw_production_schedule`** — harmonogram produkcji z informacją o zleceniach i ich statusach
+- **`vw_payment_summary`** — historia płatności z czasem realizacji
+- **`vw_customers_unified`** — ujednolicony widok klientów niezależnie od typu (indywidualny/firma)
+
+### Funkcje (Functions)
+
+Funkcje obliczeniowe wspierające logikę biznesową:
+
+- **`fn_calculate_discount`** — oblicza rabat procentowy dla zamówienia
+- **`fn_calculate_order_total`** — oblicza łączną cenę zamówienia z uwzględnieniem rabatu
+- **`fn_check_product_availability`** — sprawdza czy produkt jest dostępny w wymaganej ilości
+- **`fn_calculate_production_time`** — oblicza liczbę dni potrzebnych na produkcję (na podstawie `units_per_day`)
+- **`fn_get_last_payment_date`** — pobiera datę ostatniej płatności dla zamówienia
+
+### Procedury przechowywane (Stored Procedures)
+
+Procedury wykonujące operacje biznesowe:
+
+- **`sp_create_order`** — tworzy nowe zamówienie dla klienta
+- **`sp_add_order_detail`** — dodaje pozycję do zamówienia z automatycznym zmniejszeniem stanu magazynu
+- **`sp_update_order_status`** — zmienia status zamówienia
+- **`sp_create_production_order`** — tworzy zlecenie produkcyjne na podstawie zamówienia
+- **`sp_register_payment`** — rejestruje płatność i zmienia status zamówienia
+- **`sp_decrease_stock`** — zmniejsza stan magazynu produktu
+- **`sp_increase_stock`** — zwraca produkty do magazynu
+- **`sp_get_orders_report`** — generuje raport zamówień w danym okresie
+
+### Triggery (Triggers)
+
+Triggery automatyzujące procesy:
+
+- **`trg_create_production_order_on_order_detail`** — automatycznie tworzy zlecenie produkcyjne, gdy zamówiona ilość przekracza dostępny stan magazynu
+- **`trg_update_stock_on_production_complete`** — automatycznie zwiększa stan magazynu po zakończeniu produkcji
+- **`trg_update_order_price`** — automatycznie przelicza cenę zamówienia po zmianach pozycji
+- **`trg_log_order_status_change`** — loguje zmiany statusu zamówienia
+
+## Scenariusze użycia
+
+### Scenariusz 1: Nowe zamówienie z produktami dostępnymi i niedostępnymi
+
+```sql
+-- 1. Utwórz nowe zamówienie
+EXEC sp_create_order
+    @customer_id = 1,
+    @order_date = GETDATE(),
+    @planed_ready_date = DATEADD(DAY, 5, GETDATE()),
+    @discount = 5.0,
+    @new_order_id = @order_id OUTPUT;
+
+-- 2. Dodaj pozycje (produkt dostępny)
+EXEC sp_add_order_detail @order_id, @product_id = 1, @quantity = 2;
+
+-- 3. Dodaj pozycje (produkt niedostępny — trigger automatycznie tworzy zlecenie produkcyjne)
+EXEC sp_add_order_detail @order_id, @product_id = 2, @quantity = 10;
+
+-- 4. Zmień status na "Realizowane"
+EXEC sp_update_order_status @order_id, 'Realizowane';
+
+-- 5. Zarejestruj płatność
+EXEC sp_register_payment @order_id, 1500.00, GETDATE();
+```
+
+### Scenariusz 2: Monitorowanie stanu magazynu i produkcji
+
+```sql
+-- Sprawdzenie dostępnych produktów
+SELECT * FROM vw_available_products;
+
+-- Sprawdzenie stanu magazynu
+SELECT * FROM vw_inventory_status WHERE stock_status = 'Niski stan';
+
+-- Sprawdzenie harmonogramu produkcji
+SELECT * FROM vw_production_schedule WHERE production_status != 'Zakończone';
+```
+
+### Scenariusz 3: Raport sprzedaży i przychody
+
+```sql
+-- Raportu zamówień w wybranym okresie
+EXEC sp_get_orders_report
+    @start_date = '2025-12-01',
+    @end_date = '2025-12-31';
+
+-- Historia płatności
+SELECT * FROM vw_payment_summary
+ORDER BY payment_date DESC;
+```
+
+## Plik z kodami SQL
+
+Wszystkie widoki, procedury, funkcje i triggery znajdują się w pliku:
+**[views_procedures_functions_triggers.sql](views_procedures_functions_triggers.sql)**
+
+Plik zawiera kompletny kod SQL Server (T-SQL) gotowy do wykonania w bazie danych.
